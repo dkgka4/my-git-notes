@@ -4,7 +4,8 @@
 
 	/* 학생 학생부 성적 업로드 */
 	include_once $_SERVER['DOCUMENT_ROOT'] . '/func/PHPExcel_1.8.0/PHPExcel.php';
-	@header("Content-Type:text/html;charset=EUC-KR");
+	@header("Content-Type:text/html;charset=EUC-KR;");
+//	@header("Content-Type:text/html;charset=UTF-8;");
 	
 	$db = doConnect();	 // DB connection
 
@@ -22,10 +23,9 @@
 		'부전공' 		=> 'SUBTITLE', 
 		'비고' 			=> 'ETC'
 	);
-
+	
 	$yearSetYn = $db->query("SELECT GRADEYEAR FROM ecs_school WHERE LASTYN = 'Y' LIMIT 1;");	// 해당년도 학적을 가져온다
 	$syrw = $yearSetYn->fetch_array();
-	
 	
     if(isset($_POST) and $_SERVER['REQUEST_METHOD'] == "POST")
     {
@@ -62,6 +62,7 @@
             }
             else
             {
+            	
                 if (in_array($vpb_file_extensions, $vpb_allowed_extensions)) 
                 {
 
@@ -86,16 +87,17 @@
                             $highestColumn = $sheet -> getHighestColumn();	// 마지막 컬럼
 
                             // 학과때문에 3열 하나 가져와야함
-                            for($row = 3; $row <= 3; $row++) {
+                            for($row = 1; $row <= 1; $row++) {
                                 // $rowData가 한줄의 데이터를 셀별로 배열처리 된다.
                                 $hakGwaRowData = $sheet -> rangeToArray("A" . $row . ":" . $highestColumn . $row, NULL, TRUE, FALSE);
                                                    
                                 // $rowData에 들어가는 값은 계속 초기화 되기때문에 값을 담을 새로운 배열을 선안하고 담는다.
                                 $hakAndHakgwaAndClasArrayList = explode(" ", iconv("utf-8", "euc-kr", $hakGwaRowData[0][0]));	// 학년, 학과, 학급 정보를 취득한다.
+                                $hakAndHakgwaAndClasArrayList = $hakGwaRowData[0];
                             }
                     
                             // 한줄읽기
-                            for($row = 4; $row <= $highestRow; $row++) {
+                            for($row = 2; $row <= $highestRow; $row++) {
                                 // echo $highestRow . "<br/>";
                                 // echo $row . "<br/>";
                                 // $rowData가 한줄의 데이터를 셀별로 배열처리 된다.
@@ -108,110 +110,88 @@
                     
                     } catch(exception $e) {
                         echo $e;
-                    }	
-
-                    for ($iCnt = 0; $iCnt < sizeof($hakAndHakgwaAndClasArrayList); $iCnt++) {
-                        if (preg_match("/과/", $hakAndHakgwaAndClasArrayList[$iCnt]) || preg_match("/일반/", $hakAndHakgwaAndClasArrayList[$iCnt])) {	
-                            $__hakAndHakgwaAndClasArrayList =  explode("(",$hakAndHakgwaAndClasArrayList[$iCnt]);
-                            $nHakgwa = trim($__hakAndHakgwaAndClasArrayList[0]);	// 학과 추출
-                        }
-                
-                        if (preg_match("/학년/", $hakAndHakgwaAndClasArrayList[$iCnt])) $nHak = preg_replace("/[^0-9]*/s", "", $hakAndHakgwaAndClasArrayList[$iCnt]); // 학년
-                
-                        if (preg_match("/반/", $hakAndHakgwaAndClasArrayList[$iCnt]) && !preg_match("/일반/", $hakAndHakgwaAndClasArrayList[$iCnt])) $nBan = preg_replace("/[^0-9]*/s", "", $hakAndHakgwaAndClasArrayList[$iCnt]); // 반
                     }
                     
-                    if ($nHakgwa == '' || $nHak == '' || $nBan == '') {
-						echo "
-							<script type='text/javascript'>\n
-								alert('[알림!] 엑셀폼을 확인하세요.');\n
-							</script>\n
-						";
-						exit;				
-                    } else {
-                        
-						// 처리년도가 저장 되어있을경우 인서트가 가능
-						$selrst = $db->query("SELECT std_unique, gyeol, name FROM member WHERE std_pyear = '" . $syrw['GRADEYEAR'] . "' AND hak = '" . $nHak . "' AND gyeol = '" . $nHakgwa . "' AND use_yn = 'Y';");
+                    // 저장 항목들 가져오기
+                    $itemTitleArray = array();
+                    if (is_array($hakAndHakgwaAndClasArrayList) && sizeof($hakAndHakgwaAndClasArrayList) > 0) {
+                    	foreach ($hakAndHakgwaAndClasArrayList AS $exNum => $exText) {
+                    		$iconvExNum = trim(iconv("UTF-8", "EUC-KR", $exNum));
+                    		$iconvExText = trim(iconv("UTF-8", "EUC-KR", $exText));
+                    		$itemTitleArray[$iconvExText] = $iconvExNum;
+                    	}
+                    }
+                    
+                    if (is_array($itemTitleArray) && sizeof($itemTitleArray) > 0) {
 
-						$tmpMyinfo = array();
-						while($row = @$selrst->fetch_array()) $tmpMyinfo[$row[std_unique]][$row[name]] = "true";
-
-						$studentInfoArray = array();	$itemInfoArray = array();	$distinctArray = array();
+						$studentInfoArray = array(); // 학생들 정보 담을 배열
 						
                         if(sizeof($allData) > 0) {
                             foreach ($allData as $key => $value) {
-                                $excelBan = iconv("UTF-8", "EUC-KR", $value[0]);	// 반
-								$excelBun = iconv("UTF-8", "EUC-KR", $value[1]);	// 번호
-								$excelName = iconv("UTF-8", "EUC-KR", $value[2]);	// 성명
+                                $excelHak = iconv("UTF-8", "EUC-KR", $value[$itemTitleArray['학년']]);			// 학년
+                                $excelBan = iconv("UTF-8", "EUC-KR", $value[$itemTitleArray['반']]);			// 반
+                                $excelHakgwa = iconv("UTF-8", "EUC-KR", $value[$itemTitleArray['학과명']]);		// 학과
+								$excelBun = iconv("UTF-8", "EUC-KR", $value[$itemTitleArray['번호']]);			// 번호
+								$excelName = iconv("UTF-8", "EUC-KR", $value[$itemTitleArray['성명']]);			// 성명
+								$excelUniq = iconv("UTF-8", "EUC-KR", $value[$itemTitleArray['학생개인번호']]);	// 학생개인번호
 								
-								if ($excelBan != '' && $excelBun != '' && $excelName != '') {
-									// echo "$excelBan/$excelBun/$excelName<br>";
-									if ($excelBun == '번호' && $excelName == '성명') {
-										$itemInfoArray = array();
-										for ($j = 2; $j <= 12; $j++) {	// 4 ~ 7 열에 있는 정보만 조회
-											if (iconv("UTF-8", "EUC-KR", $value[$j]) != '') $itemInfoArray[iconv("UTF-8", "EUC-KR", $value[$j])] = $j;
-										}
-									}
-					
-									/*print_r($itemInfoArray);
-									echo "<br><br>";*/
-									$itemInfoArray = sizeof($itemInfoArray) > 0? $itemInfoArray : array();	// 데이터가 있다면 그대로 없다면 초기화
-									if ($excelBan != '반' && $excelBun != '번호' && $excelName != '성명' && sizeof($itemInfoArray) > 0) {	// 이런 항목이 있다면 넣지 말고
-										foreach ($itemInfoArray AS $iNum => $val) {
-											// echo $itemCodeArray[$key] . "<br>";
-											$studentInfoArray[(int)$excelBan][(int)$excelBun][$excelName][$itemCodeArray[$iNum]] = iconv("UTF-8", "EUC-KR", $value[$val]);
-											if ($itemCodeArray[$iNum] == 'ONLYNUMBER') $distinctArray['s' . iconv("UTF-8", "EUC-KR", $value[$val])] = 'TRUE';	// 중복아이디 필터링 기능
-										}
+								if ($excelHakgwa != '' && $excelHak != '' && $excelBan != '' && $excelBun != '' && $excelName != '' && $excelUniq != '') {
+									
+									foreach ($itemTitleArray AS $iTxt => $val) {
+										// echo $itemCodeArray[$key] . "<br>";
+										$studentInfoArray[$excelUniq][$iTxt] = iconv("UTF-8", "EUC-KR", $value[$val]);
 									}
 								}								
-                            	
                             }
                         }
                         
 	                   	$multiQyery = "";	// GENDER
-						if (sizeof($studentInfoArray) > 0) {	// 학생 자료가 있다면
-							foreach ($studentInfoArray AS $iBanKey => $iBanValue) {
-								foreach ($studentInfoArray[$iBanKey] AS $iBunKey => $iBunValue) {
-									foreach ($studentInfoArray[$iBanKey][$iBunKey] AS $iNameKey => $iNameValue) {
-										if ($tmpMyinfo[$studentInfoArray[$iBanKey][$iBunKey][$iNameKey]['ONLYNUMBER']][$iNameKey] == 'true') {	// 업데이트
-											$multiQyery .= "
-												UPDATE member SET member_level = '2', std_state = '재학', std_pyear = '" . $syrw['GRADEYEAR'] . "',
-													name = '" . $iNameKey . "', password = PASSWORD('" . preg_replace("/[^0-9]*/s", "", $studentInfoArray[$iBanKey][$iBunKey][$iNameKey]['ONLYNUMBER']) . "'),
-													sex = '" . ($studentInfoArray[$iBanKey][$iBunKey][$iNameKey]['GENDER'] == '남성'? '1' : '2') . "',
-													gyeol = '" . $nHakgwa . "', hak = '" . $nHak . "', ban = '" . $iBanKey . "', bun = '" . $iBunKey . "',
-													std_unique = '" . $studentInfoArray[$iBanKey][$iBunKey][$iNameKey]['ONLYNUMBER'] . "',
-													post_no = '" . $studentInfoArray[$iBanKey][$iBunKey][$iNameKey]['ADDRNUMBER'] . "',
-													birth = '" . preg_replace("/[^0-9]*/s", "", $studentInfoArray[$iBanKey][$iBunKey][$iNameKey]['BIRTHDAY']) . "',
-													address = '" . $studentInfoArray[$iBanKey][$iBunKey][$iNameKey]['ADDR'] . "'
-												WHERE std_pyear = '" . $syrw['GRADEYEAR'] . "' AND hak = '" . $nHak . "' AND ban = '" . $iBanKey . "'
-													AND bun = '" . $iBunKey . "' AND std_unique = '" . $studentInfoArray[$iBanKey][$iBunKey][$iNameKey]['ONLYNUMBER'] . "'
-													AND name = '" . $iNameKey . "';
-											";	// preg_replace("/[^0-9]*/s", "", trim($rowOfSchool['PHONE']))
-										} else {	// 삽입
-											$multiQyery .= "
-												INSERT INTO member SET user_id = '" . ('s' . $studentInfoArray[$iBanKey][$iBunKey][$iNameKey]['ONLYNUMBER']) . "',
-													member_level = '2', std_state = '재학', std_pyear = '" . $syrw['GRADEYEAR'] . "',
-													name = '" . $iNameKey . "', password = PASSWORD('" .  preg_replace("/[^0-9]*/s", "", $studentInfoArray[$iBanKey][$iBunKey][$iNameKey]['ONLYNUMBER']) . "'),
-													sex = '" . ($studentInfoArray[$iBanKey][$iBunKey][$iNameKey]['GENDER'] == '남성'? '1' : '2') . "',
-													gyeol = '" . $nHakgwa . "', hak = '" . $nHak . "', ban = '" . $iBanKey . "', bun = '" . $iBunKey . "',
-													std_unique = '" . $studentInfoArray[$iBanKey][$iBunKey][$iNameKey]['ONLYNUMBER'] . "',
-													post_no = '" . $studentInfoArray[$iBanKey][$iBunKey][$iNameKey]['ADDRNUMBER'] . "',
-													birth = '" . preg_replace("/[^0-9]*/s", "", $studentInfoArray[$iBanKey][$iBunKey][$iNameKey]['BIRTHDAY']) . "',
-													address = '" . $studentInfoArray[$iBanKey][$iBunKey][$iNameKey]['ADDR'] . "',
-													reg_date = '" . _getYearToSecond() . "';
-											";
-										}
-									}
+	                   	if (sizeof($studentInfoArray) > 0) {	// 학생 자료가 있다면
+	                   		foreach ($studentInfoArray AS $iUniqKey => $iValueArr) {
+	                   		
+		                   		// 처리년도가 저장 되어있을경우 인서트가 가능
+								$selrst = $db->query("SELECT * FROM member WHERE std_pyear = '" . $syrw['GRADEYEAR'] . "' AND hak = '" . $iValueArr['학년'] . "' AND gyeol = '" . $iValueArr['학과'] . "' AND ban = '" . $iValueArr['반'] . "' AND bun = '" . $iValueArr['번호'] . "' LIMIT 1;");
+								$row = @$selrst->fetch_array();
+								
+								if ($row['no'] != "") {
+									$multiQyery .= "
+										UPDATE member SET member_level = '2', std_state = '재학', std_pyear = '" . $syrw['GRADEYEAR'] . "',
+											name = '" . $iValueArr['성명'] . "', password = PASSWORD('" . preg_replace("/[^0-9]*/s", "", $iValueArr['학생개인번호']) . "'),
+											sex = '" . ($iValueArr['성별'] == '남성'? '1' : '2') . "',
+											gyeol = '" . $iValueArr['학과명'] . "', hak = '" . $iValueArr['학년'] . "', ban = '" . $iValueArr['반'] . "', 
+											bun = '" . $iValueArr['번호'] . "',
+											std_unique = '" . $iValueArr['학생개인번호'] . "',
+											post_no = '" . $iValueArr['우편번호'] . "',
+											birth = '" . preg_replace("/[^0-9]*/s", "", $iValueArr['생년월일']) . "',
+											address = '" . $iValueArr['주소'] . "'
+										WHERE std_pyear = '" . $syrw['GRADEYEAR'] . "' AND hak = '" . $row['hak'] . "' AND ban = '" . $row['ban'] . "'
+											AND bun = '" . $row['bun'] . "' AND std_unique = '" . $row['std_unique'] . "'
+											AND name = '" . $row['name'] . "';
+									";	// preg_replace("/[^0-9]*/s", "", trim($rowOfSchool['PHONE']))								
+								} else {
+									$multiQyery .= "
+										INSERT INTO member SET user_id = '" . ('s' . $iValueArr['학생개인번호']) . "',
+											member_level = '2', std_state = '재학', std_pyear = '" . $syrw['GRADEYEAR'] . "',
+											name = '" . $iValueArr['성명'] . "', password = PASSWORD('" .  preg_replace("/[^0-9]*/s", "", $iValueArr['학생개인번호']) . "'),
+											sex = '" . ($iValueArr['성별'] == '남성'? '1' : '2') . "',
+											gyeol = '" . $iValueArr['학과명'] . "', hak = '" . $iValueArr['학년'] . "', ban = '" . $iValueArr['반'] . "', 
+											bun = '" . $iValueArr['번호'] . "',
+											std_unique = '" . $iValueArr['학생개인번호'] . "',
+											post_no = '" . $iValueArr['우편번호'] . "',
+											birth = '" . preg_replace("/[^0-9]*/s", "", $iValueArr['생년월일']) . "',
+											address = '" . $iValueArr['주소'] . "',
+											reg_date = '" . _getYearToSecond() . "';
+									";								
 								}
-							}
-						}
-				
+                   			}
+                  	 	}
+						
 						if ($multiQyery != '') {
 							if ($result = @$db->multi_query($multiQyery)) {
 								echo "
 									<script type='text/javascript'>\n
 										alert('[알림!] 학생 일괄등록을 정상적으로 처리하였습니다.');\n
-										parent.info400vObj.getList();
+										parent.multi_changes.list();
 									</script>\n
 								";
 							}
@@ -219,12 +199,11 @@
 							echo "
 								<script type='text/javascript'>\n
 									alert('[알림!] 학생 일괄등록을 정상적으로 처리하였습니다.');\n
-									parent.info400vObj.getList();
+									parent.multi_changes.list();
 								</script>\n
 							";
-						}                     
-                        
-                    }
+						}     
+                    }                
                 }
             }
         }        
